@@ -1,0 +1,30 @@
+[package]
+name = "pyttch"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "pyttch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pyttch"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+cli = ["clap"]
+
+[dependencies]
+ureq = { version = "3", features = ["json"] }
+clap = { version = "4", features = ["derive", "env"], optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

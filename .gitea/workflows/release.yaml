@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: macos-arm64
+    steps:
+      - name: Checkout
+        run: |
+          rm -rf src
+          TAG="${GITHUB_REF##*/}"
+          git clone --branch "$TAG" --depth 1 https://git.calii.net/cali/pyttch.git src
+
+      - name: Build macOS arm64
+        working-directory: src
+        run: cargo build --release
+
+      - name: Build Linux x86_64 (musl static)
+        working-directory: src
+        run: cargo build --release --target x86_64-unknown-linux-musl
+
+      - name: Build Windows x86_64
+        working-directory: src
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Stage release artifacts
+        run: |
+          mkdir -p release
+          cp /Users/cali/Developer/perso/ttyfam/target/release/pyttch release/pyttch-macos-arm64
+          cp /Users/cali/Developer/perso/ttyfam/target/x86_64-unknown-linux-musl/release/pyttch release/pyttch-linux-x86_64
+          cp /Users/cali/Developer/perso/ttyfam/target/x86_64-pc-windows-gnu/release/pyttch.exe release/pyttch-windows-x86_64.exe
+          ls -lh release/
+
+      - name: Create Gitea release with binaries
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          REPO_FULL="${GITHUB_REPOSITORY:-cali/pyttch}"
+          API="https://git.calii.net/api/v1"
+
+          echo "Creating release $TAG for $REPO_FULL"
+
+          BODY=$(printf '{"tag_name":"%s","name":"%s","body":"Automated release","draft":false,"prerelease":false}' "$TAG" "$TAG")
+          RESPONSE=$(curl -fsS -X POST "$API/repos/$REPO_FULL/releases" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          RELEASE_ID=$(echo "$RESPONSE" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+          echo "Release ID: $RELEASE_ID"
+
+          for f in release/*; do
+            name=$(basename "$f")
+            echo "Uploading $name"
+            curl -fsS -X POST "$API/repos/$REPO_FULL/releases/$RELEASE_ID/assets?name=$name" \
+              -H "Authorization: token $TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$f"
+          done
