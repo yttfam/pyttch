@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" alt="pyttch" width="180"/></p>
+
 # pyttch
 
 Telegram message sender and listener. Library + CLI. Sync, minimal, no framework.
